@@ -8,7 +8,7 @@ declare global {
       openPopup: (config: {
         researchId: string;
         onReady?: () => void;
-        onSubmit?: (data: { conversationId?: string }) => void;
+        onSubmit?: (data: Record<string, unknown>) => void;
         onClose?: () => void;
         onError?: (error: Error) => void;
       }) => void;
@@ -34,14 +34,23 @@ export default function Home() {
     if (window.Perspective) {
       window.Perspective.openPopup({
         researchId: "ICYxmulx",
-        onSubmit: (data) => {
-          // Redirect to result page with conversation ID
-          const conversationId = data?.conversationId;
+        onSubmit: (data: Record<string, unknown>) => {
+          console.log("Perspective onSubmit data:", JSON.stringify(data, null, 2));
+
+          // Try different possible property names
+          const conversationId =
+            data?.conversationId ||
+            data?.conversation_id ||
+            data?.id ||
+            (data?.conversation as Record<string, unknown>)?.id;
+
           if (conversationId) {
             window.location.href = `/result?cid=${conversationId}`;
           } else {
-            // Fallback if no conversation ID
-            window.location.href = "/result";
+            // Generate a temporary ID based on timestamp for tracking
+            const tempId = `temp_${Date.now()}`;
+            console.log("No conversation ID found, using temp ID:", tempId);
+            window.location.href = `/result?cid=${tempId}`;
           }
         },
         onError: (error) => {
