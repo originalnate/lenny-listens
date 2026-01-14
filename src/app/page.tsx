@@ -1,6 +1,58 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+
+declare global {
+  interface Window {
+    Perspective?: {
+      openPopup: (config: {
+        researchId: string;
+        onReady?: () => void;
+        onSubmit?: (data: { conversationId?: string }) => void;
+        onClose?: () => void;
+        onError?: (error: Error) => void;
+      }) => void;
+    };
+  }
+}
+
 export default function Home() {
+  const perspectiveLoaded = useRef(false);
+
+  useEffect(() => {
+    // Load Perspective SDK
+    if (perspectiveLoaded.current) return;
+    perspectiveLoaded.current = true;
+
+    const script = document.createElement("script");
+    script.src = "https://getperspective.ai/v1/embed.js";
+    script.async = true;
+    document.body.appendChild(script);
+  }, []);
+
+  const openIntake = () => {
+    if (window.Perspective) {
+      window.Perspective.openPopup({
+        researchId: "ICYxmulx",
+        onSubmit: (data) => {
+          // Redirect to result page with conversation ID
+          const conversationId = data?.conversationId;
+          if (conversationId) {
+            window.location.href = `/result?cid=${conversationId}`;
+          } else {
+            // Fallback if no conversation ID
+            window.location.href = "/result";
+          }
+        },
+        onError: (error) => {
+          console.error("Perspective error:", error);
+        },
+      });
+    } else {
+      console.error("Perspective SDK not loaded");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white dark:from-zinc-900 dark:to-black">
       <main className="mx-auto max-w-4xl px-6 py-16">
@@ -19,10 +71,9 @@ export default function Home() {
             interviewing methodology. Understand your customers like never before.
           </p>
 
-          {/* CTA Button - Opens Intake Popup */}
+          {/* CTA Button - Opens Intake Popup via JS API */}
           <button
-            data-perspective-popup="ICYxmulx"
-            data-perspective-params="returnUrl=https://lenny-listens.vercel.app/result"
+            onClick={openIntake}
             className="inline-flex h-14 items-center justify-center gap-2 rounded-full bg-amber-500 px-8 text-lg font-semibold text-white shadow-lg transition-all hover:bg-amber-600 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 dark:bg-amber-600 dark:hover:bg-amber-500"
           >
             Create Your Lenny Interview

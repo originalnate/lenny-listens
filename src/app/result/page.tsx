@@ -1,59 +1,102 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-
-interface GeneratedPerspective {
-  name: string;
-  company: string;
-  previewUrl: string;
-  shareUrl: string;
-  useCase: string;
-}
+import { GeneratedPerspective, getUseCaseLabel } from "@/lib/lenny-methodology";
 
 function ResultContent() {
   const searchParams = useSearchParams();
-  const [isGenerating, setIsGenerating] = useState(true);
+  const conversationId = searchParams.get("cid");
+
   const [perspective, setPerspective] = useState<GeneratedPerspective | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    // Simulate generation delay
-    const timer = setTimeout(() => {
-      // In production, this would call /api/generate with the conversation_id
-      // For now, using demo data
-      setPerspective({
-        name: searchParams.get("name") || "Product Leader",
-        company: searchParams.get("company") || "Your Company",
-        previewUrl: "https://pv.getperspective.ai/share/demo?mode=preview",
-        shareUrl: "https://getperspective.ai/share/demo",
-        useCase: searchParams.get("useCase") || "feature_request",
-      });
-      setIsGenerating(false);
-    }, 2500);
+  const fetchPerspective = useCallback(async () => {
+    if (!conversationId) {
+      setError("No conversation ID provided");
+      return;
+    }
 
-    return () => clearTimeout(timer);
-  }, [searchParams]);
+    try {
+      const response = await fetch(`/api/perspective/${conversationId}`);
+
+      if (response.status === 404) {
+        // Perspective not found yet - might still be processing webhook
+        setPerspective({
+          conversation_id: conversationId,
+          status: "pending",
+          intake: {
+            conversation_id: conversationId,
+            name: "",
+            company_domain: "",
+            use_case: "feature_request",
+            created_at: new Date().toISOString(),
+          },
+          created_at: new Date().toISOString(),
+        });
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch perspective");
+      }
+
+      const data = await response.json();
+      setPerspective(data);
+    } catch (err) {
+      console.error("Error fetching perspective:", err);
+      setError("Failed to load your interview. Please try again.");
+    }
+  }, [conversationId]);
+
+  useEffect(() => {
+    fetchPerspective();
+
+    // Poll every 3 seconds if status is pending or generating
+    const interval = setInterval(() => {
+      if (perspective?.status === "pending" || perspective?.status === "generating") {
+        fetchPerspective();
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [fetchPerspective, perspective?.status]);
 
   const copyShareLink = () => {
-    if (perspective) {
-      navigator.clipboard.writeText(perspective.shareUrl);
+    if (perspective?.share_url) {
+      navigator.clipboard.writeText(perspective.share_url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
   };
 
-  const getUseCaseLabel = (useCase: string) => {
-    const labels: Record<string, string> = {
-      feature_request: "Feature Requests",
-      new_product_discovery: "Product Discovery",
-      existing_feature_feedback: "Feature Feedback",
-    };
-    return labels[useCase] || "Customer Research";
-  };
+  // Error state
+  if (error) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-amber-50 to-white dark:from-zinc-900 dark:to-black">
+        <div className="text-center">
+          <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
+            <svg className="h-8 w-8 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </div>
+          <h1 className="mb-4 text-2xl font-bold text-zinc-900 dark:text-white">{error}</h1>
+          <a href="/" className="text-amber-600 hover:underline dark:text-amber-400">
+            ← Go back and try again
+          </a>
+        </div>
+      </div>
+    );
+  }
 
-  if (isGenerating) {
+  // Loading/Pending state
+  if (!perspective || perspective.status === "pending" || perspective.status === "generating") {
+    const statusMessage = perspective?.status === "generating"
+      ? "Creating your personalized Lenny interview..."
+      : "Processing your intake...";
+
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-amber-50 to-white dark:from-zinc-900 dark:to-black">
         <div className="text-center">
@@ -61,15 +104,47 @@ function ResultContent() {
             <div className="mx-auto h-16 w-16 animate-spin rounded-full border-4 border-amber-200 border-t-amber-500" />
           </div>
           <h1 className="mb-4 text-2xl font-bold text-zinc-900 dark:text-white">
-            Generating your Lenny interview...
+            {statusMessage}
           </h1>
           <p className="text-zinc-600 dark:text-zinc-400">
-            Applying methodology from 269 podcast episodes
+            Applying Lenny&apos;s methodology from 269 podcast episodes
           </p>
+          {perspective?.intake?.company_domain && (
+            <p className="mt-4 text-sm text-zinc-500">
+              Customizing for <span className="font-medium">{perspective.intake.company_domain}</span>
+            </p>
+          )}
         </div>
       </div>
     );
   }
+
+  // Error state from generation
+  if (perspective.status === "error") {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-amber-50 to-white dark:from-zinc-900 dark:to-black">
+        <div className="text-center">
+          <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
+            <svg className="h-8 w-8 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h1 className="mb-4 text-2xl font-bold text-zinc-900 dark:text-white">
+            Something went wrong
+          </h1>
+          <p className="mb-6 text-zinc-600 dark:text-zinc-400">
+            {perspective.error || "Failed to generate your interview. Please try again."}
+          </p>
+          <a href="/" className="text-amber-600 hover:underline dark:text-amber-400">
+            ← Go back and try again
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  // Ready state - show the generated perspective
+  const companyName = perspective.intake?.company_domain?.replace(/\.(com|io|co|ai|org|net)$/i, "") || "Your Company";
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white dark:from-zinc-900 dark:to-black">
@@ -87,9 +162,9 @@ function ResultContent() {
           <p className="text-lg text-zinc-600 dark:text-zinc-400">
             Custom research interview for{" "}
             <span className="font-semibold text-amber-600 dark:text-amber-400">
-              {perspective?.company}
+              {companyName}
             </span>{" "}
-            about {getUseCaseLabel(perspective?.useCase || "")}
+            about {getUseCaseLabel(perspective.intake?.use_case || "")}
           </p>
         </div>
 
@@ -110,7 +185,7 @@ function ResultContent() {
               Experience the interview as if you were one of your customers being interviewed by Lenny.
             </p>
             <a
-              href={perspective?.previewUrl}
+              href={perspective.preview_url}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-amber-500 px-6 font-semibold text-white transition-colors hover:bg-amber-600"
@@ -196,7 +271,7 @@ function ResultContent() {
 export default function ResultPage() {
   return (
     <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-amber-50 to-white dark:from-zinc-900 dark:to-black">
         <div className="h-16 w-16 animate-spin rounded-full border-4 border-amber-200 border-t-amber-500" />
       </div>
     }>
