@@ -22,7 +22,7 @@ export default function Home() {
           {/* CTA Button - Opens Intake Popup */}
           <button
             data-perspective-popup="ICYxmulx"
-            data-perspective-params="returnUrl=/result"
+            data-perspective-params="returnUrl=https://lenny-listens.vercel.app/result"
             className="inline-flex h-14 items-center justify-center gap-2 rounded-full bg-amber-500 px-8 text-lg font-semibold text-white shadow-lg transition-all hover:bg-amber-600 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 dark:bg-amber-600 dark:hover:bg-amber-500"
           >
             Create Your Lenny Interview
