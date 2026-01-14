@@ -1,100 +1,36 @@
-# Lenny's Podcast Transcripts Archive
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-A comprehensive archive of transcripts from [Lenny's Podcast](https://www.youtube.com/@LennysPodcast), organized for easy use with AI coding assistants and language models.
+## Getting Started
 
-## About Lenny's Podcast
-
-Lenny's Podcast features interviews with world-class product leaders and growth experts, providing concrete, actionable, and tactical advice to help you build, launch, and grow your own product.
-
-## Repository Structure
-
-```
-episodes/
-├── guest-name/
-│   └── transcript.md
-├── another-guest/
-│   └── transcript.md
-└── ...
-```
-
-Each episode has its own folder named after the guest(s), containing a `transcript.md` file with:
-
-1. **YAML Frontmatter** - Structured metadata including:
-   - `guest`: Name of the guest(s)
-   - `title`: Full episode title
-   - `youtube_url`: Link to the YouTube video
-   - `video_id`: YouTube video ID
-   - `description`: Episode description
-   - `duration_seconds`: Episode length in seconds
-   - `duration`: Human-readable duration
-   - `view_count`: Number of views at time of archival
-   - `channel`: Channel name
-
-2. **Transcript Content** - Full text transcript of the episode
-
-## Usage with AI
-
-### Loading Transcripts
-
-Each transcript is a standalone markdown file that can be easily parsed by AI systems. The YAML frontmatter provides structured metadata that can be extracted programmatically.
-
-### Example: Reading a Transcript
-
-```python
-import yaml
-import os
-
-def read_transcript(filepath):
-    with open(filepath, 'r') as f:
-        content = f.read()
-    
-    # Split frontmatter and content
-    parts = content.split('---')
-    if len(parts) >= 3:
-        frontmatter = yaml.safe_load(parts[1])
-        transcript = '---'.join(parts[2:])
-        return frontmatter, transcript
-    return None, content
-
-# Example usage
-metadata, transcript = read_transcript('episodes/brian-chesky/transcript.md')
-print(f"Guest: {metadata['guest']}")
-print(f"Title: {metadata['title']}")
-```
-
-### Finding Episodes by Topic
-
-You can search across all transcripts to find episodes discussing specific topics:
+First, run the development server:
 
 ```bash
-# Find episodes mentioning "product-market fit"
-grep -r "product-market fit" episodes/
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
 ```
 
-### Listing All Episodes
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-```bash
-# List all episode folders
-ls episodes/
-```
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-## Episode Count
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-This archive contains **284 transcripts** from Lenny's Podcast episodes.
+## Learn More
 
-## Data Sources
+To learn more about Next.js, take a look at the following resources:
 
-- **Transcripts**: Sourced from the Lenny's Podcast Transcripts Archive
-- **Metadata**: Extracted from the [Lenny's Podcast YouTube channel](https://www.youtube.com/@LennysPodcast)
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-## Contributing
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-If you notice any issues with the transcripts or metadata, please open an issue or submit a pull request.
+## Deploy on Vercel
 
-## Disclaimer
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
-This archive is for educational and research purposes. All content belongs to Lenny's Podcast and the respective guests. Please visit the official YouTube channel to support the creators.
-
-## License
-
-The transcripts are provided for personal and educational use. Please respect the original content creators' rights.
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
