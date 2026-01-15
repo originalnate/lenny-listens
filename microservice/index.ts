@@ -20,18 +20,23 @@ async function updateKV(conversationId: string, data: Record<string, unknown>) {
     return;
   }
 
-  const response = await fetch(`${KV_REST_API_URL}/set/perspective:${conversationId}`, {
+  // Upstash REST API format: POST with command array
+  const response = await fetch(KV_REST_API_URL, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${KV_REST_API_TOKEN}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(data),
+    body: JSON.stringify(["SET", `perspective:${conversationId}`, JSON.stringify(data)]),
   });
 
   if (!response.ok) {
+    const errorText = await response.text();
+    console.error("KV update failed:", response.status, errorText);
     throw new Error(`Failed to update KV: ${response.statusText}`);
   }
+
+  console.log(`KV updated for ${conversationId}`);
 }
 
 // Full intake data type
