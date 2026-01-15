@@ -34,28 +34,85 @@ async function updateKV(conversationId: string, data: Record<string, unknown>) {
   }
 }
 
-// Generate a Lenny perspective using Claude Agent SDK + Perspective MCP
-async function generatePerspective(intake: {
+// Full intake data type
+interface IntakeData {
   name: string;
   company_domain: string;
   use_case: string;
-}) {
+  problem_to_solve?: string;
+  current_workaround?: string;
+  market_or_audience?: string;
+  hypothesis?: string;
+  feature_name?: string;
+  feedback_aspects?: string;
+}
+
+// Generate a Lenny perspective using Claude Agent SDK + Perspective MCP
+async function generatePerspective(intake: IntakeData) {
   const { name, company_domain, use_case } = intake;
   const companyName = company_domain.replace(/\.(com|io|co|ai|org|net)$/i, "");
+
+  // Build context from all available intake fields
+  let researchContext = "";
+
+  if (use_case === "new_product_discovery" || use_case === "new product discovery") {
+    researchContext = `
+RESEARCH GOAL: Validate a new product concept
+
+${intake.market_or_audience ? `TARGET AUDIENCE: ${intake.market_or_audience}` : ""}
+${intake.hypothesis ? `HYPOTHESIS TO VALIDATE: ${intake.hypothesis}` : ""}
+
+The interview should explore:
+- Whether the target audience has the problem this product solves
+- How they currently deal with this problem (or if they even recognize it)
+- Their reaction to the product concept
+- What would make them want to use it
+- Potential concerns or objections`;
+  } else if (use_case === "feature_request" || use_case === "feature requests") {
+    researchContext = `
+RESEARCH GOAL: Understand feature requests and needs
+
+${intake.problem_to_solve ? `PROBLEM USERS ARE TRYING TO SOLVE: ${intake.problem_to_solve}` : ""}
+${intake.current_workaround ? `CURRENT WORKAROUND: ${intake.current_workaround}` : ""}
+
+The interview should explore:
+- The specific pain points driving this request
+- How they currently work around the limitation
+- What an ideal solution would look like
+- How important this is relative to other needs`;
+  } else if (use_case === "existing_feature_feedback" || use_case === "existing feature feedback") {
+    researchContext = `
+RESEARCH GOAL: Get feedback on an existing feature
+
+${intake.feature_name ? `FEATURE: ${intake.feature_name}` : ""}
+${intake.feedback_aspects ? `SPECIFIC ASPECTS TO EXPLORE: ${intake.feedback_aspects}` : ""}
+
+The interview should explore:
+- How they use this feature today
+- What works well and what doesn't
+- Specific frustrations or delights
+- Ideas for improvement`;
+  }
 
   const prompt = `Create a Perspective AI research interview using the perspective_create tool.
 
 Use these parameters:
 - workspace_id: "66b2a843beda3ed6fd4507bd"
 - agent_context: "research"
-- description: Create a research interview called "Lenny Listens: ${companyName}" for understanding ${use_case} from ${companyName}'s customers.
+
+IMPORTANT: The description must be highly specific to this research context. Do NOT create a generic interview.
+
+RESEARCH CONTEXT FOR ${companyName.toUpperCase()}:
+${researchContext || `Use case: ${use_case}`}
+
+Create a research interview called "Lenny Listens: ${companyName}" that is SPECIFICALLY designed to explore the context above.
 
 Use Lenny Rachitsky's interviewing methodology from 269 episodes of Lenny's Podcast:
 
 THREE-LAYER APPROACH:
-1. Origin Story - Start with how they discovered the problem or need
-2. Framework - Extract their mental model, criteria, and tradeoffs
-3. Application - Get specific examples and concrete details
+1. Origin Story - Start with how they discovered the problem or need described above
+2. Framework - Extract their mental model, criteria, and tradeoffs related to this specific topic
+3. Application - Get specific examples and concrete details about their experience
 
 CORE TECHNIQUES:
 - "Pull the thread" - When something interesting emerges, dig deeper
@@ -68,9 +125,9 @@ VOICE:
 - Use phrases like "I'm curious...", "That's really interesting...", "Can you give me a specific example?"
 - Take a student posture, not an expert position
 
-Target audience: ${companyName}'s customers discussing ${use_case}
+The description you pass to perspective_create MUST include the specific research context above - do not generalize it.
 
-Call the perspective_create tool now with this description.`;
+Call the perspective_create tool now.`;
 
   let result: {
     perspective_id?: string;
