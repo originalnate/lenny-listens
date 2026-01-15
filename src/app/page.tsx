@@ -28,6 +28,30 @@ export default function Home() {
     script.src = "https://getperspective.ai/v1/embed.js";
     script.async = true;
     document.body.appendChild(script);
+
+    // Listen for postMessage events from Perspective iframe
+    const handleMessage = (event: MessageEvent) => {
+      // Only accept messages from Perspective
+      if (!event.origin.includes("getperspective.ai")) return;
+
+      console.log("PostMessage from Perspective:", event.data);
+
+      if (event.data?.type === "perspective:submit") {
+        const conversationId =
+          event.data?.conversationId ||
+          event.data?.conversation_id ||
+          event.data?.interview_id ||
+          event.data?.id;
+
+        if (conversationId) {
+          console.log("Got conversation ID from postMessage:", conversationId);
+          window.location.href = `/result?cid=${conversationId}`;
+        }
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
   }, []);
 
   const openIntake = () => {
@@ -41,16 +65,20 @@ export default function Home() {
           const conversationId =
             data?.conversationId ||
             data?.conversation_id ||
+            data?.interview_id ||
             data?.id ||
             (data?.conversation as Record<string, unknown>)?.id;
 
           if (conversationId) {
+            console.log("Got conversation ID from callback:", conversationId);
             window.location.href = `/result?cid=${conversationId}`;
           } else {
-            // Generate a temporary ID based on timestamp for tracking
-            const tempId = `temp_${Date.now()}`;
-            console.log("No conversation ID found, using temp ID:", tempId);
-            window.location.href = `/result?cid=${tempId}`;
+            // Wait a moment for postMessage to potentially fire, then redirect to polling page
+            console.log("No conversation ID in callback, waiting for postMessage or using polling...");
+            setTimeout(() => {
+              // If we haven't redirected yet (postMessage didn't fire), go to result with polling mode
+              window.location.href = `/result?poll=true`;
+            }, 1000);
           }
         },
         onError: (error) => {

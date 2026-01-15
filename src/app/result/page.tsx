@@ -8,19 +8,26 @@ import { GeneratedPerspective, getUseCaseLabel } from "@/lib/lenny-methodology";
 function ResultContent() {
   const searchParams = useSearchParams();
   const conversationId = searchParams.get("cid");
+  const pollMode = searchParams.get("poll") === "true";
 
   const [perspective, setPerspective] = useState<GeneratedPerspective | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   const fetchPerspective = useCallback(async () => {
-    if (!conversationId) {
+    // If no conversation ID and not in poll mode, show error
+    if (!conversationId && !pollMode) {
       setError("No conversation ID provided");
       return;
     }
 
     try {
-      const response = await fetch(`/api/perspective/${conversationId}`);
+      // Use latest endpoint in poll mode, otherwise fetch by ID
+      const url = conversationId
+        ? `/api/perspective/${conversationId}`
+        : `/api/perspective/latest`;
+
+      const response = await fetch(url);
 
       if (response.status === 404) {
         // Perspective not found yet - might still be processing webhook
@@ -49,7 +56,7 @@ function ResultContent() {
       console.error("Error fetching perspective:", err);
       setError("Failed to load your interview. Please try again.");
     }
-  }, [conversationId]);
+  }, [conversationId, pollMode]);
 
   useEffect(() => {
     fetchPerspective();
