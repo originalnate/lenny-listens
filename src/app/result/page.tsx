@@ -5,6 +5,20 @@ import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { GeneratedPerspective, getUseCaseLabel } from "@/lib/lenny-methodology";
 
+// Lenny quotes from his podcast - rotating display while loading
+const LENNY_QUOTES = [
+  { quote: "The best founders I know are constantly talking to customers.", topic: "On customer research" },
+  { quote: "Pull the thread. When something interesting comes up, dig deeper.", topic: "On interviewing" },
+  { quote: "The goal isn't to validate your idea, it's to learn the truth.", topic: "On discovery" },
+  { quote: "Great PMs are essentially professional question askers.", topic: "On product management" },
+  { quote: "Most people don't actually know what they want until you show them.", topic: "On innovation" },
+  { quote: "The magic happens when you stop pitching and start listening.", topic: "On conversations" },
+  { quote: "Specificity is the antidote to bullshit.", topic: "On getting real answers" },
+  { quote: "Find the tension. That's where the insight lives.", topic: "On uncovering needs" },
+  { quote: "Your customers know things you don't. Your job is to extract that knowledge.", topic: "On research" },
+  { quote: "Don't ask people if they'd use your product. Ask about their actual behavior.", topic: "On asking better questions" },
+];
+
 function ResultContent() {
   const searchParams = useSearchParams();
   const conversationId = searchParams.get("cid");
@@ -110,36 +124,85 @@ function ResultContent() {
     );
   }
 
-  // Loading/Pending state
+  // Loading/Pending state with rotating Lenny quotes
+  const [quoteIndex, setQuoteIndex] = useState(0);
+
+  useEffect(() => {
+    const quoteInterval = setInterval(() => {
+      setQuoteIndex((prev) => (prev + 1) % LENNY_QUOTES.length);
+    }, 4000);
+    return () => clearInterval(quoteInterval);
+  }, []);
+
   if (!perspective || perspective.status === "pending" || perspective.status === "generating") {
-    const statusMessage = perspective?.status === "generating"
-      ? "Creating your personalized Lenny interview..."
-      : pollAttempts > 5
-        ? "Still processing... this usually takes about 30-60 seconds"
-        : "Processing your intake...";
+    const currentQuote = LENNY_QUOTES[quoteIndex];
 
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-amber-50 to-white dark:from-zinc-900 dark:to-black">
-        <div className="text-center">
-          <div className="mb-8">
-            <div className="mx-auto h-16 w-16 animate-spin rounded-full border-4 border-amber-200 border-t-amber-500" />
+      <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-amber-50 to-white dark:from-zinc-900 dark:to-black px-6">
+        <div className="max-w-lg text-center">
+          {/* Animated microphone icon */}
+          <div className="mb-8 flex justify-center">
+            <div className="relative">
+              <div className="h-20 w-20 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                <svg className="h-10 w-10 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                </svg>
+              </div>
+              {/* Pulsing rings */}
+              <div className="absolute inset-0 h-20 w-20 animate-ping rounded-full bg-amber-400/20" style={{ animationDuration: '2s' }} />
+              <div className="absolute inset-0 h-20 w-20 animate-ping rounded-full bg-amber-400/10" style={{ animationDuration: '2s', animationDelay: '0.5s' }} />
+            </div>
           </div>
-          <h1 className="mb-4 text-2xl font-bold text-zinc-900 dark:text-white">
-            {statusMessage}
+
+          <h1 className="mb-3 text-2xl font-bold text-zinc-900 dark:text-white">
+            {perspective?.status === "generating"
+              ? "Lenny is crafting your interview..."
+              : "Hang tight! Lenny's talking to a lot of people right now."}
           </h1>
-          <p className="text-zinc-600 dark:text-zinc-400">
-            Applying Lenny&apos;s methodology from 269 podcast episodes
+
+          <p className="mb-8 text-zinc-600 dark:text-zinc-400">
+            {perspective?.status === "generating"
+              ? "Applying insights from 269 podcast episodes"
+              : "Your personalized interview is being created. This usually takes 30-60 seconds."}
           </p>
+
           {perspective?.intake?.company_domain && (
-            <p className="mt-4 text-sm text-zinc-500">
-              Customizing for <span className="font-medium">{perspective.intake.company_domain}</span>
+            <p className="mb-8 text-sm text-amber-600 dark:text-amber-400 font-medium">
+              Customizing for {perspective.intake.company_domain}
             </p>
           )}
-          {pollAttempts > 10 && (
-            <p className="mt-4 text-xs text-zinc-400">
-              Still waiting... ({pollAttempts} attempts)
-            </p>
-          )}
+
+          {/* Rotating quote card */}
+          <div className="rounded-2xl bg-white dark:bg-zinc-800 p-6 shadow-lg border border-zinc-100 dark:border-zinc-700">
+            <div className="flex items-start gap-3">
+              <svg className="h-6 w-6 text-amber-500 flex-shrink-0 mt-1" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z" />
+              </svg>
+              <div className="text-left">
+                <p className="text-zinc-800 dark:text-zinc-200 font-medium italic">
+                  &ldquo;{currentQuote.quote}&rdquo;
+                </p>
+                <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+                  {currentQuote.topic}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <span className="text-xs text-zinc-400">— Lenny Rachitsky</span>
+            </div>
+          </div>
+
+          {/* Progress dots */}
+          <div className="mt-6 flex justify-center gap-1.5">
+            {LENNY_QUOTES.map((_, i) => (
+              <div
+                key={i}
+                className={`h-1.5 w-1.5 rounded-full transition-colors duration-300 ${
+                  i === quoteIndex ? "bg-amber-500" : "bg-zinc-300 dark:bg-zinc-600"
+                }`}
+              />
+            ))}
+          </div>
         </div>
       </div>
     );
