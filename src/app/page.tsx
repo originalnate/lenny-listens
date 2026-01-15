@@ -36,19 +36,24 @@ export default function Home() {
       // Only accept messages from Perspective
       if (!event.origin.includes("getperspective.ai")) return;
 
-      console.log("PostMessage from Perspective:", event.data);
+      console.log("PostMessage from Perspective:", JSON.stringify(event.data, null, 2));
 
-      if (event.data?.type === "perspective:submit") {
-        const conversationId =
-          event.data?.conversationId ||
-          event.data?.conversation_id ||
-          event.data?.interview_id ||
-          event.data?.id;
+      // Try to extract interview ID from any message type
+      const data = event.data || {};
+      const conversationId =
+        data.conversationId ||
+        data.conversation_id ||
+        data.interview_id ||
+        data.interviewId ||
+        data.id ||
+        data.data?.conversationId ||
+        data.data?.conversation_id ||
+        data.data?.interview_id ||
+        data.data?.id;
 
-        if (conversationId) {
-          console.log("Got conversation ID from postMessage:", conversationId);
-          window.location.href = `/result?cid=${conversationId}`;
-        }
+      if (conversationId && (data.type === "perspective:submit" || data.type === "perspective:complete" || data.type === "perspective:redirect")) {
+        console.log("Got conversation ID from postMessage:", conversationId);
+        window.location.href = `/result?cid=${conversationId}`;
       }
     };
 
@@ -60,15 +65,29 @@ export default function Home() {
     if (window.Perspective) {
       window.Perspective.openPopup({
         researchId: "ICYxmulx",
-        returnUrl: `${window.location.origin}/result?cid={interview_id}`,
         onSubmit: (data: Record<string, unknown>) => {
           console.log("Perspective onSubmit data:", JSON.stringify(data, null, 2));
-          // returnUrl will handle redirect with interview_id
-        },
-        onNavigate: (url: string) => {
-          console.log("Perspective onNavigate URL:", url);
-          // This is called with the returnUrl populated with the actual interview_id
-          window.location.href = url;
+
+          // Try to extract interview ID from callback data
+          const conversationId =
+            data?.conversationId ||
+            data?.conversation_id ||
+            data?.interview_id ||
+            data?.interviewId ||
+            data?.id ||
+            (data?.interview as Record<string, unknown>)?.id ||
+            (data?.conversation as Record<string, unknown>)?.id;
+
+          if (conversationId) {
+            console.log("Got conversation ID from onSubmit:", conversationId);
+            window.location.href = `/result?cid=${conversationId}`;
+          } else {
+            // Fallback: wait briefly then redirect to poll mode
+            console.log("No conversation ID in onSubmit, falling back to poll mode");
+            setTimeout(() => {
+              window.location.href = `/result?poll=true`;
+            }, 1000);
+          }
         },
         onError: (error) => {
           console.error("Perspective error:", error);
