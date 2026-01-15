@@ -156,16 +156,21 @@ Call the perspective_create tool now.`;
       },
     },
   })) {
+    // Log message type for debugging
+    console.log("Message keys:", Object.keys(message));
+
     // Check for tool use results in the message
     if ("toolUseResults" in message && Array.isArray(message.toolUseResults)) {
+      console.log("Found toolUseResults:", JSON.stringify(message.toolUseResults, null, 2));
       for (const toolResult of message.toolUseResults) {
         if (toolResult.toolName?.includes("perspective_create")) {
           try {
             const data = typeof toolResult.result === "string"
               ? JSON.parse(toolResult.result)
               : toolResult.result;
+            console.log("Parsed tool result data:", JSON.stringify(data, null, 2));
             result = {
-              perspective_id: data.perspective_id,
+              perspective_id: data.perspective_id || data.id,
               preview_url: data.preview_url,
               share_url: data.share_url,
             };
@@ -182,16 +187,37 @@ Call the perspective_create tool now.`;
 
       // Parse URLs from the result text if we don't have them yet
       if (!result.preview_url) {
-        const previewMatch = message.result.match(/https:\/\/pv\.getperspective\.ai\/share\/[^\s\)]+/);
-        const shareMatch = message.result.match(/https:\/\/getperspective\.ai\/share\/[^\s\)]+/);
-        const idMatch = message.result.match(/Perspective ID[:\s`]*([a-f0-9]{24})/i);
+        const previewMatch = message.result.match(/https:\/\/pv\.getperspective\.ai\/share\/[^\s\)\]\"]+/);
+        const shareMatch = message.result.match(/https:\/\/getperspective\.ai\/share\/[^\s\)\]\"]+/);
 
         if (previewMatch) result.preview_url = previewMatch[0];
         if (shareMatch) result.share_url = shareMatch[0];
-        if (idMatch) result.perspective_id = idMatch[1];
+      }
+
+      // Try multiple patterns for perspective ID extraction
+      if (!result.perspective_id) {
+        // Pattern 1: "Perspective ID: xxx" or "perspective_id: xxx"
+        const idMatch1 = message.result.match(/[Pp]erspective[_ ][Ii][Dd][:\s`"']*([a-f0-9]{24})/i);
+        // Pattern 2: Any 24-char hex string that looks like a MongoDB ObjectId
+        const idMatch2 = message.result.match(/\b([a-f0-9]{24})\b/);
+        // Pattern 3: "id": "xxx" in JSON-like format
+        const idMatch3 = message.result.match(/["']?id["']?\s*[:\s]\s*["']?([a-f0-9]{24})["']?/i);
+
+        if (idMatch1) {
+          result.perspective_id = idMatch1[1];
+          console.log("Extracted ID via pattern 1:", result.perspective_id);
+        } else if (idMatch3) {
+          result.perspective_id = idMatch3[1];
+          console.log("Extracted ID via pattern 3:", result.perspective_id);
+        } else if (idMatch2) {
+          result.perspective_id = idMatch2[1];
+          console.log("Extracted ID via pattern 2:", result.perspective_id);
+        }
       }
     }
   }
+
+  console.log("Final extracted result:", JSON.stringify(result, null, 2));
 
   return result;
 }
