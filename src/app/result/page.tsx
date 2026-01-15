@@ -1,9 +1,25 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { GeneratedPerspective, getUseCaseLabel } from "@/lib/lenny-methodology";
+
+declare global {
+  interface Window {
+    Perspective?: {
+      init: (config: {
+        researchId: string;
+        type: "popup" | "slider" | "widget" | "fullpage" | "chat";
+        params?: Record<string, string>;
+        onReady?: () => void;
+        onSubmit?: (data: { researchId: string }) => void;
+        onClose?: () => void;
+        onError?: (error: Error) => void;
+      }) => void;
+    };
+  }
+}
 
 // Lenny quotes from his podcast - rotating display while loading
 const LENNY_QUOTES = [
@@ -29,6 +45,18 @@ function ResultContent() {
   const [copied, setCopied] = useState(false);
   const [pollAttempts, setPollAttempts] = useState(0);
   const maxPollAttempts = 60; // Try for about 3 minutes
+  const perspectiveLoaded = useRef(false);
+
+  // Load Perspective SDK
+  useEffect(() => {
+    if (perspectiveLoaded.current) return;
+    perspectiveLoaded.current = true;
+
+    const script = document.createElement("script");
+    script.src = "https://getperspective.ai/v1/embed.js";
+    script.async = true;
+    document.body.appendChild(script);
+  }, []);
 
   const fetchPerspective = useCallback(async () => {
     // Need either conversation ID or session ID
@@ -102,6 +130,29 @@ function ResultContent() {
       navigator.clipboard.writeText(perspective.share_url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const openPreviewInterview = () => {
+    if (!perspective?.perspective_id) {
+      console.error("No perspective ID available");
+      return;
+    }
+
+    if (window.Perspective) {
+      window.Perspective.init({
+        researchId: perspective.perspective_id,
+        type: "popup",
+        onClose: () => {
+          console.log("Preview interview closed");
+        },
+        onError: (error) => {
+          console.error("Perspective error:", error);
+        },
+      });
+    } else {
+      // Fallback to opening in new tab if SDK not loaded
+      window.open(perspective.preview_url, "_blank");
     }
   };
 
@@ -273,17 +324,15 @@ function ResultContent() {
             <p className="mb-6 text-zinc-600 dark:text-zinc-400">
               Experience the interview as if you were one of your customers being interviewed by Lenny.
             </p>
-            <a
-              href={perspective.preview_url}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              onClick={openPreviewInterview}
               className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-amber-500 px-6 font-semibold text-white transition-colors hover:bg-amber-600"
             >
               Start Preview Interview
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
               </svg>
-            </a>
+            </button>
           </div>
 
           {/* Invite Customers Card */}
