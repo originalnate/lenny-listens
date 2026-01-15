@@ -54,10 +54,22 @@ export async function POST(request: NextRequest) {
 
     console.log(`Stored intake for conversation ${conversationId}`);
 
+    // Trigger perspective generation via Railway microservice (fire and forget)
+    const generatorUrl = process.env.GENERATOR_URL || "https://lenny-listens-production.up.railway.app";
+    fetch(`${generatorUrl}/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ conversation_id: conversationId, intake }),
+    }).catch((err) => {
+      console.error("Failed to trigger generation:", err);
+    });
+
+    console.log(`Triggered generation for conversation ${conversationId}`);
+
     return NextResponse.json({
       success: true,
       conversation_id: conversationId,
-      message: "Intake stored, perspective generation pending",
+      message: "Intake stored, generation triggered",
     });
   } catch (error) {
     console.error("Webhook error:", error);
