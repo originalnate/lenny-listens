@@ -8,41 +8,37 @@ import { GeneratedPerspective, getUseCaseLabel } from "@/lib/lenny-methodology";
 function ResultContent() {
   const searchParams = useSearchParams();
   const conversationId = searchParams.get("cid");
-  const pollMode = searchParams.get("poll") === "true";
+  const sessionId = searchParams.get("session");
 
   const [perspective, setPerspective] = useState<GeneratedPerspective | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [pollAttempts, setPollAttempts] = useState(0);
-  const [foundId, setFoundId] = useState<string | null>(conversationId); // Track the ID we're polling
-  const maxPollAttempts = 40; // Try for about 2 minutes (generation takes ~2 min)
+  const maxPollAttempts = 60; // Try for about 3 minutes
 
   const fetchPerspective = useCallback(async () => {
-    // If no conversation ID and not in poll mode, show error
-    if (!conversationId && !pollMode) {
-      setError("No conversation ID provided");
+    // Need either conversation ID or session ID
+    if (!conversationId && !sessionId) {
+      setError("No session or conversation ID provided");
       return;
     }
 
     try {
-      // Once we've found an ID, always poll that specific one
-      // Otherwise use latest endpoint in poll mode
-      const url = foundId
-        ? `/api/perspective/${foundId}`
-        : `/api/perspective/latest`;
+      // Use session lookup if we have session ID, otherwise direct conversation lookup
+      const url = sessionId
+        ? `/api/perspective/session/${sessionId}`
+        : `/api/perspective/${conversationId}`;
 
       const response = await fetch(url);
 
       if (response.status === 404) {
-        // Perspective not found yet - might still be processing webhook
-        if (pollMode) {
-          setPollAttempts((prev) => prev + 1);
-        }
+        // Not found yet - might still be processing webhook
+        setPollAttempts((prev) => prev + 1);
         setPerspective({
-          conversation_id: foundId || "pending",
+          conversation_id: conversationId || "pending",
           status: "pending",
           intake: {
-            conversation_id: foundId || "pending",
+            conversation_id: conversationId || "pending",
             name: "",
             company_domain: "",
             use_case: "feature_request",
@@ -59,22 +55,16 @@ function ResultContent() {
 
       const data = await response.json();
       setPerspective(data);
-
-      // Once we find a perspective, lock onto its ID for future polls
-      if (data.conversation_id && !foundId) {
-        setFoundId(data.conversation_id);
-      }
-
       setPollAttempts(0); // Reset on success
     } catch (err) {
       console.error("Error fetching perspective:", err);
-      if (pollMode && pollAttempts < maxPollAttempts) {
+      if (pollAttempts < maxPollAttempts) {
         setPollAttempts((prev) => prev + 1);
       } else {
         setError("Failed to load your interview. Please try again.");
       }
     }
-  }, [conversationId, pollMode, pollAttempts, foundId]);
+  }, [conversationId, sessionId, pollAttempts]);
 
   useEffect(() => {
     fetchPerspective();
@@ -82,9 +72,8 @@ function ResultContent() {
     // Poll every 3 seconds if status is pending or generating
     const interval = setInterval(() => {
       if (perspective?.status === "pending" || perspective?.status === "generating") {
-        // Stop polling if we've exceeded max attempts in poll mode
-        if (pollMode && pollAttempts >= maxPollAttempts) {
-          setError("Could not find your interview. The webhook may not have processed yet. Please try again in a moment.");
+        if (pollAttempts >= maxPollAttempts) {
+          setError("Could not find your interview. Please try again in a moment.");
           return;
         }
         fetchPerspective();
@@ -92,7 +81,7 @@ function ResultContent() {
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [fetchPerspective, perspective?.status, pollMode, pollAttempts]);
+  }, [fetchPerspective, perspective?.status, pollAttempts]);
 
   const copyShareLink = () => {
     if (perspective?.share_url) {
@@ -125,8 +114,8 @@ function ResultContent() {
   if (!perspective || perspective.status === "pending" || perspective.status === "generating") {
     const statusMessage = perspective?.status === "generating"
       ? "Creating your personalized Lenny interview..."
-      : pollMode && pollAttempts > 0
-        ? "Waiting for your intake to process..."
+      : pollAttempts > 5
+        ? "Still processing... this usually takes about 30-60 seconds"
         : "Processing your intake...";
 
     return (
@@ -146,7 +135,7 @@ function ResultContent() {
               Customizing for <span className="font-medium">{perspective.intake.company_domain}</span>
             </p>
           )}
-          {pollMode && pollAttempts > 3 && (
+          {pollAttempts > 10 && (
             <p className="mt-4 text-xs text-zinc-400">
               Still waiting... ({pollAttempts} attempts)
             </p>

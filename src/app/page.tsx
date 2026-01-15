@@ -7,10 +7,9 @@ declare global {
     Perspective?: {
       openPopup: (config: {
         researchId: string;
-        returnUrl?: string;
+        params?: Record<string, string>;
         onReady?: () => void;
-        onSubmit?: (data: Record<string, unknown>) => void;
-        onNavigate?: (url: string) => void;
+        onSubmit?: (data: { researchId: string }) => void;
         onClose?: () => void;
         onError?: (error: Error) => void;
       }) => void;
@@ -63,31 +62,18 @@ export default function Home() {
 
   const openIntake = () => {
     if (window.Perspective) {
-      // Store session start time to identify this user's intake
-      const sessionId = Date.now().toString();
-      sessionStorage.setItem("lenny_session_id", sessionId);
-      sessionStorage.setItem("lenny_session_start", sessionId);
+      // Generate unique session ID to track this user's intake
+      const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
       window.Perspective.openPopup({
         researchId: "ICYxmulx",
-        onSubmit: (data: Record<string, unknown>) => {
-          console.log("Perspective onSubmit data:", JSON.stringify(data, null, 2));
-
-          const conversationId =
-            data?.conversationId ||
-            data?.conversation_id ||
-            data?.interview_id ||
-            data?.interviewId ||
-            data?.id;
-
-          if (conversationId) {
-            window.location.href = `/result?cid=${conversationId}`;
-          } else {
-            window.location.href = `/result?poll=true&session=${sessionId}`;
-          }
+        // Pass session_id as custom param - gets stored in participant_metadata
+        params: { session_id: sessionId },
+        onSubmit: () => {
+          // Redirect with session ID - webhook will have stored data indexed by this
+          window.location.href = `/result?session=${sessionId}`;
         },
         onClose: () => {
-          // Popup closed - don't auto-redirect as user may have just closed it
           console.log("Perspective popup closed");
         },
         onError: (error) => {

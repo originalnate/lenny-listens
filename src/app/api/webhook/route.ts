@@ -15,6 +15,9 @@ export async function POST(request: NextRequest) {
     const conversationId = payload.interview_id || payload.conversation_id || payload.id;
     const fields = payload.structured_output || payload.fields || {};
     const participantMeta = payload.participant_metadata || {};
+    const sessionId = participantMeta.session_id as string | undefined;
+
+    console.log("Session ID from metadata:", sessionId);
 
     if (!conversationId) {
       return NextResponse.json(
@@ -51,6 +54,12 @@ export async function POST(request: NextRequest) {
 
     // Also add to a list of pending generations for easy lookup
     await kv.lpush("pending_perspectives", conversationId);
+
+    // Index by session_id if provided (for client-side lookup)
+    if (sessionId) {
+      await kv.set(`session:${sessionId}`, conversationId, { ex: 3600 }); // Expire in 1 hour
+      console.log(`Indexed session ${sessionId} -> ${conversationId}`);
+    }
 
     console.log(`Stored intake for conversation ${conversationId}`);
 
