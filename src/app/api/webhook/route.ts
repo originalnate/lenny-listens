@@ -10,12 +10,15 @@ export async function POST(request: NextRequest) {
     console.log("Webhook received:", JSON.stringify(payload, null, 2));
 
     // Extract conversation data from Perspective webhook payload
-    const conversationId = payload.conversation_id || payload.id;
-    const fields = payload.fields || {};
+    // Perspective uses interview_id for the conversation ID
+    // and structured_output for the collected fields
+    const conversationId = payload.interview_id || payload.conversation_id || payload.id;
+    const fields = payload.structured_output || payload.fields || {};
+    const participantMeta = payload.participant_metadata || {};
 
     if (!conversationId) {
       return NextResponse.json(
-        { error: "Missing conversation_id" },
+        { error: "Missing conversation_id/interview_id" },
         { status: 400 }
       );
     }
@@ -23,7 +26,7 @@ export async function POST(request: NextRequest) {
     // Map Perspective fields to our IntakeData structure
     const intake: IntakeData = {
       conversation_id: conversationId,
-      name: fields.name || "Unknown",
+      name: fields.name || participantMeta.name || "Unknown",
       company_domain: fields.company_domain || "",
       use_case: fields.use_case || "feature_request",
       problem_to_solve: fields.problem_to_solve,
