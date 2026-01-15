@@ -63,31 +63,32 @@ export default function Home() {
 
   const openIntake = () => {
     if (window.Perspective) {
+      // Store session start time to identify this user's intake
+      const sessionId = Date.now().toString();
+      sessionStorage.setItem("lenny_session_id", sessionId);
+      sessionStorage.setItem("lenny_session_start", sessionId);
+
       window.Perspective.openPopup({
         researchId: "ICYxmulx",
         onSubmit: (data: Record<string, unknown>) => {
           console.log("Perspective onSubmit data:", JSON.stringify(data, null, 2));
 
-          // Try to extract interview ID from callback data
           const conversationId =
             data?.conversationId ||
             data?.conversation_id ||
             data?.interview_id ||
             data?.interviewId ||
-            data?.id ||
-            (data?.interview as Record<string, unknown>)?.id ||
-            (data?.conversation as Record<string, unknown>)?.id;
+            data?.id;
 
           if (conversationId) {
-            console.log("Got conversation ID from onSubmit:", conversationId);
             window.location.href = `/result?cid=${conversationId}`;
           } else {
-            // Fallback: wait briefly then redirect to poll mode
-            console.log("No conversation ID in onSubmit, falling back to poll mode");
-            setTimeout(() => {
-              window.location.href = `/result?poll=true`;
-            }, 1000);
+            window.location.href = `/result?poll=true&session=${sessionId}`;
           }
+        },
+        onClose: () => {
+          // Popup closed - don't auto-redirect as user may have just closed it
+          console.log("Perspective popup closed");
         },
         onError: (error) => {
           console.error("Perspective error:", error);
