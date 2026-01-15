@@ -73,12 +73,12 @@ export default function Home() {
             console.log("Got conversation ID from callback:", conversationId);
             window.location.href = `/result?cid=${conversationId}`;
           } else {
-            // Wait a moment for postMessage to potentially fire, then redirect to polling page
-            console.log("No conversation ID in callback, waiting for postMessage or using polling...");
+            // Wait longer for webhook to process before redirecting to polling page
+            console.log("No conversation ID in callback, waiting for webhook to process...");
             setTimeout(() => {
               // If we haven't redirected yet (postMessage didn't fire), go to result with polling mode
               window.location.href = `/result?poll=true`;
-            }, 1000);
+            }, 3000); // Give webhook 3 seconds to fire and store data
           }
         },
         onError: (error) => {

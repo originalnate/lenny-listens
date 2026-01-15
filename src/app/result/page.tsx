@@ -13,6 +13,8 @@ function ResultContent() {
   const [perspective, setPerspective] = useState<GeneratedPerspective | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [pollAttempts, setPollAttempts] = useState(0);
+  const maxPollAttempts = 20; // Try for about 60 seconds
 
   const fetchPerspective = useCallback(async () => {
     // If no conversation ID and not in poll mode, show error
@@ -31,6 +33,9 @@ function ResultContent() {
 
       if (response.status === 404) {
         // Perspective not found yet - might still be processing webhook
+        if (pollMode) {
+          setPollAttempts((prev) => prev + 1);
+        }
         setPerspective({
           conversation_id: conversationId || "pending",
           status: "pending",
@@ -52,11 +57,16 @@ function ResultContent() {
 
       const data = await response.json();
       setPerspective(data);
+      setPollAttempts(0); // Reset on success
     } catch (err) {
       console.error("Error fetching perspective:", err);
-      setError("Failed to load your interview. Please try again.");
+      if (pollMode && pollAttempts < maxPollAttempts) {
+        setPollAttempts((prev) => prev + 1);
+      } else {
+        setError("Failed to load your interview. Please try again.");
+      }
     }
-  }, [conversationId, pollMode]);
+  }, [conversationId, pollMode, pollAttempts]);
 
   useEffect(() => {
     fetchPerspective();
@@ -64,12 +74,17 @@ function ResultContent() {
     // Poll every 3 seconds if status is pending or generating
     const interval = setInterval(() => {
       if (perspective?.status === "pending" || perspective?.status === "generating") {
+        // Stop polling if we've exceeded max attempts in poll mode
+        if (pollMode && pollAttempts >= maxPollAttempts) {
+          setError("Could not find your interview. The webhook may not have processed yet. Please try again in a moment.");
+          return;
+        }
         fetchPerspective();
       }
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [fetchPerspective, perspective?.status]);
+  }, [fetchPerspective, perspective?.status, pollMode, pollAttempts]);
 
   const copyShareLink = () => {
     if (perspective?.share_url) {
@@ -102,7 +117,9 @@ function ResultContent() {
   if (!perspective || perspective.status === "pending" || perspective.status === "generating") {
     const statusMessage = perspective?.status === "generating"
       ? "Creating your personalized Lenny interview..."
-      : "Processing your intake...";
+      : pollMode && pollAttempts > 0
+        ? "Waiting for your intake to process..."
+        : "Processing your intake...";
 
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-amber-50 to-white dark:from-zinc-900 dark:to-black">
@@ -119,6 +136,11 @@ function ResultContent() {
           {perspective?.intake?.company_domain && (
             <p className="mt-4 text-sm text-zinc-500">
               Customizing for <span className="font-medium">{perspective.intake.company_domain}</span>
+            </p>
+          )}
+          {pollMode && pollAttempts > 3 && (
+            <p className="mt-4 text-xs text-zinc-400">
+              Still waiting... ({pollAttempts} attempts)
             </p>
           )}
         </div>
