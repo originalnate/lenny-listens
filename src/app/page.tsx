@@ -5,8 +5,9 @@ import { useEffect, useRef } from "react";
 declare global {
   interface Window {
     Perspective?: {
-      openPopup: (config: {
+      init: (config: {
         researchId: string;
+        type: "popup" | "slider" | "widget" | "fullpage" | "chat";
         params?: Record<string, string>;
         onReady?: () => void;
         onSubmit?: (data: { researchId: string }) => void;
@@ -65,11 +66,13 @@ export default function Home() {
       // Generate unique session ID to track this user's intake
       const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
-      window.Perspective.openPopup({
+      window.Perspective.init({
         researchId: "ICYxmulx",
+        type: "popup",
         // Pass session_id as custom param - gets stored in participant_metadata
         params: { session_id: sessionId },
         onSubmit: () => {
+          console.log("Perspective onSubmit fired, redirecting with session:", sessionId);
           // Redirect with session ID - webhook will have stored data indexed by this
           window.location.href = `/result?session=${sessionId}`;
         },
