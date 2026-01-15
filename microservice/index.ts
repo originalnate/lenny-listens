@@ -125,7 +125,7 @@ async function createPerspective(description: string): Promise<{
   preview_url: string;
   share_url: string;
 }> {
-  // MCP uses JSON-RPC 2.0 format
+  // MCP uses JSON-RPC 2.0 format, but returns SSE stream
   const response = await fetch("https://getperspective.ai/mcp", {
     method: "POST",
     headers: {
@@ -153,33 +153,45 @@ async function createPerspective(description: string): Promise<{
     throw new Error(`MCP call failed: ${response.statusText}`);
   }
 
-  const result = await response.json();
-  console.log("MCP response:", JSON.stringify(result, null, 2));
+  // Handle SSE response - read the full text and parse
+  const text = await response.text();
+  console.log("Raw MCP response:", text.substring(0, 500));
 
-  // Handle MCP response format
-  if (result.error) {
-    throw new Error(`MCP error: ${result.error.message || JSON.stringify(result.error)}`);
-  }
-
-  // Extract the content from MCP response
-  // MCP tool results come in result.content array
+  // Parse SSE format - look for JSON data in the stream
   let data: Record<string, unknown> = {};
 
-  if (result.result?.content) {
-    for (const item of result.result.content) {
-      if (item.type === "text") {
-        try {
-          data = JSON.parse(item.text);
-        } catch {
-          console.log("Content text (not JSON):", item.text);
+  // SSE format: "event: message\ndata: {...json...}\n\n"
+  const lines = text.split("\n");
+  for (const line of lines) {
+    if (line.startsWith("data: ")) {
+      const jsonStr = line.substring(6);
+      try {
+        const parsed = JSON.parse(jsonStr);
+        console.log("Parsed SSE data:", JSON.stringify(parsed, null, 2));
+
+        // Check for the result in various locations
+        if (parsed.result?.content) {
+          for (const item of parsed.result.content) {
+            if (item.type === "text") {
+              try {
+                data = JSON.parse(item.text);
+              } catch {
+                console.log("Content text (not JSON):", item.text);
+              }
+            }
+          }
+        } else if (parsed.perspective_id || parsed.preview_url) {
+          data = parsed;
+        } else if (parsed.result) {
+          data = parsed.result;
         }
+      } catch (e) {
+        // Not JSON, skip
       }
     }
-  } else if (result.result) {
-    data = result.result;
   }
 
-  console.log("Parsed data:", JSON.stringify(data, null, 2));
+  console.log("Final parsed data:", JSON.stringify(data, null, 2));
 
   if (!data.perspective_id && !data.preview_url) {
     throw new Error("Failed to get perspective data from MCP response");
