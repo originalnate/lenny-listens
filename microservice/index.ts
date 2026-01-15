@@ -7,6 +7,7 @@ const PERSPECTIVE_MCP_TOKEN = process.env.PERSPECTIVE_MCP_TOKEN;
 const KV_REST_API_URL = process.env.KV_REST_API_URL;
 const KV_REST_API_TOKEN = process.env.KV_REST_API_TOKEN;
 const WORKSPACE_ID = "66b2a843beda3ed6fd4507bd";
+const LENNY_AVATAR_URL = "https://lenny-listens.vercel.app/lenny.jpg";
 
 if (!PERSPECTIVE_MCP_TOKEN) {
   console.error("Missing PERSPECTIVE_MCP_TOKEN environment variable");
@@ -204,6 +205,41 @@ async function createPerspective(description: string): Promise<{
   };
 }
 
+// Update perspective to set Lenny as the host with his avatar
+async function updatePerspectiveHost(perspectiveId: string): Promise<void> {
+  const feedback = `Set the interviewer/host name to "Lenny Rachitsky" and use this avatar image URL: ${LENNY_AVATAR_URL}`;
+
+  const response = await fetch("https://getperspective.ai/mcp", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${PERSPECTIVE_MCP_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: Date.now(),
+      method: "tools/call",
+      params: {
+        name: "perspective_update",
+        arguments: {
+          workspace_id: WORKSPACE_ID,
+          perspective_id: perspectiveId,
+          feedback: feedback,
+        },
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("MCP update failed:", response.status, errorText);
+    throw new Error(`MCP update failed: ${response.statusText}`);
+  }
+
+  const text = await response.text();
+  console.log("Perspective update response:", text.substring(0, 500));
+}
+
 // Main endpoint
 app.post("/generate", async (req, res) => {
   try {
@@ -223,6 +259,15 @@ app.post("/generate", async (req, res) => {
     const result = await createPerspective(description);
 
     console.log(`Created perspective: ${result.perspective_id}`);
+
+    // Update the perspective to set Lenny as the host with his avatar
+    try {
+      await updatePerspectiveHost(result.perspective_id);
+      console.log("Updated perspective with Lenny's name and avatar");
+    } catch (updateError) {
+      // Log but don't fail - the perspective is still usable
+      console.error("Failed to set Lenny as host:", updateError);
+    }
 
     // Update KV with the generated URLs
     if (conversation_id) {
