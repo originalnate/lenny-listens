@@ -90,6 +90,28 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white dark:from-zinc-900 dark:to-black">
+      {/* Header with Perspective AI branding */}
+      <header className="border-b border-zinc-200 bg-white/80 backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-900/80">
+        <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-3">
+          <div className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+            Lenny Listens
+          </div>
+          <a
+            href="https://getperspective.ai"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-sm text-zinc-500 transition-colors hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+          >
+            <span>Powered by</span>
+            <img
+              src="/perspective-logo.png"
+              alt="Perspective AI"
+              className="h-5 w-auto"
+            />
+          </a>
+        </div>
+      </header>
+
       <main className="mx-auto max-w-4xl px-6 py-16">
         {/* Hero Section */}
         <div className="text-center">
