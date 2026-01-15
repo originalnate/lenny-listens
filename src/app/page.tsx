@@ -7,8 +7,10 @@ declare global {
     Perspective?: {
       openPopup: (config: {
         researchId: string;
+        returnUrl?: string;
         onReady?: () => void;
         onSubmit?: (data: Record<string, unknown>) => void;
+        onNavigate?: (url: string) => void;
         onClose?: () => void;
         onError?: (error: Error) => void;
       }) => void;
@@ -58,28 +60,15 @@ export default function Home() {
     if (window.Perspective) {
       window.Perspective.openPopup({
         researchId: "ICYxmulx",
+        returnUrl: `${window.location.origin}/result?cid={interview_id}`,
         onSubmit: (data: Record<string, unknown>) => {
           console.log("Perspective onSubmit data:", JSON.stringify(data, null, 2));
-
-          // Try different possible property names
-          const conversationId =
-            data?.conversationId ||
-            data?.conversation_id ||
-            data?.interview_id ||
-            data?.id ||
-            (data?.conversation as Record<string, unknown>)?.id;
-
-          if (conversationId) {
-            console.log("Got conversation ID from callback:", conversationId);
-            window.location.href = `/result?cid=${conversationId}`;
-          } else {
-            // Wait longer for webhook to process before redirecting to polling page
-            console.log("No conversation ID in callback, waiting for webhook to process...");
-            setTimeout(() => {
-              // If we haven't redirected yet (postMessage didn't fire), go to result with polling mode
-              window.location.href = `/result?poll=true`;
-            }, 3000); // Give webhook 3 seconds to fire and store data
-          }
+          // returnUrl will handle redirect with interview_id
+        },
+        onNavigate: (url: string) => {
+          console.log("Perspective onNavigate URL:", url);
+          // This is called with the returnUrl populated with the actual interview_id
+          window.location.href = url;
         },
         onError: (error) => {
           console.error("Perspective error:", error);
