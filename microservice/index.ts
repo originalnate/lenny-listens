@@ -1,4 +1,3 @@
-import { query } from "@anthropic-ai/claude-agent-sdk";
 import express from "express";
 
 const app = express();
@@ -7,6 +6,7 @@ app.use(express.json());
 const PERSPECTIVE_MCP_TOKEN = process.env.PERSPECTIVE_MCP_TOKEN;
 const KV_REST_API_URL = process.env.KV_REST_API_URL;
 const KV_REST_API_TOKEN = process.env.KV_REST_API_TOKEN;
+const WORKSPACE_ID = "66b2a843beda3ed6fd4507bd";
 
 if (!PERSPECTIVE_MCP_TOKEN) {
   console.error("Missing PERSPECTIVE_MCP_TOKEN environment variable");
@@ -20,7 +20,6 @@ async function updateKV(conversationId: string, data: Record<string, unknown>) {
     return;
   }
 
-  // Upstash REST API format: POST with command array
   const response = await fetch(KV_REST_API_URL, {
     method: "POST",
     headers: {
@@ -39,7 +38,7 @@ async function updateKV(conversationId: string, data: Record<string, unknown>) {
   console.log(`KV updated for ${conversationId}`);
 }
 
-// Full intake data type
+// Intake data type
 interface IntakeData {
   name: string;
   company_domain: string;
@@ -52,72 +51,61 @@ interface IntakeData {
   feedback_aspects?: string;
 }
 
-// Generate a Lenny perspective using Claude Agent SDK + Perspective MCP
-async function generatePerspective(intake: IntakeData) {
-  const { name, company_domain, use_case } = intake;
-  const companyName = company_domain.replace(/\.(com|io|co|ai|org|net)$/i, "");
+// Build the perspective description based on use case
+function buildDescription(intake: IntakeData): string {
+  const companyName = intake.company_domain.replace(/\.(com|io|co|ai|org|net)$/i, "");
 
-  // Build context from all available intake fields
-  let researchContext = "";
+  let researchGoal = "";
+  let specificContext = "";
 
-  if (use_case === "new_product_discovery" || use_case === "new product discovery") {
-    researchContext = `
-RESEARCH GOAL: Validate a new product concept
+  if (intake.use_case === "new_product_discovery" || intake.use_case === "new product discovery") {
+    researchGoal = "validate a new product concept";
+    specificContext = `
+Target audience: ${intake.market_or_audience || "potential customers"}
+Hypothesis to validate: ${intake.hypothesis || "the product solves a real problem"}
 
-${intake.market_or_audience ? `TARGET AUDIENCE: ${intake.market_or_audience}` : ""}
-${intake.hypothesis ? `HYPOTHESIS TO VALIDATE: ${intake.hypothesis}` : ""}
-
-The interview should explore:
-- Whether the target audience has the problem this product solves
-- How they currently deal with this problem (or if they even recognize it)
+Explore:
+- Whether users have the problem this product solves
+- How they currently deal with this problem
 - Their reaction to the product concept
-- What would make them want to use it
-- Potential concerns or objections`;
-  } else if (use_case === "feature_request" || use_case === "feature requests") {
-    researchContext = `
-RESEARCH GOAL: Understand feature requests and needs
+- What would make them want to use it`;
+  } else if (intake.use_case === "feature_request" || intake.use_case === "feature requests") {
+    researchGoal = "understand feature requests and user needs";
+    specificContext = `
+Problem users are trying to solve: ${intake.problem_to_solve || "unspecified"}
+Current workaround: ${intake.current_workaround || "unknown"}
 
-${intake.problem_to_solve ? `PROBLEM USERS ARE TRYING TO SOLVE: ${intake.problem_to_solve}` : ""}
-${intake.current_workaround ? `CURRENT WORKAROUND: ${intake.current_workaround}` : ""}
-
-The interview should explore:
+Explore:
 - The specific pain points driving this request
 - How they currently work around the limitation
 - What an ideal solution would look like
 - How important this is relative to other needs`;
-  } else if (use_case === "existing_feature_feedback" || use_case === "existing feature feedback") {
-    researchContext = `
-RESEARCH GOAL: Get feedback on an existing feature
+  } else if (intake.use_case === "existing_feature_feedback" || intake.use_case === "existing feature feedback") {
+    researchGoal = "get feedback on an existing feature";
+    specificContext = `
+Feature: ${intake.feature_name || "unspecified"}
+Aspects to explore: ${intake.feedback_aspects || "general feedback"}
 
-${intake.feature_name ? `FEATURE: ${intake.feature_name}` : ""}
-${intake.feedback_aspects ? `SPECIFIC ASPECTS TO EXPLORE: ${intake.feedback_aspects}` : ""}
-
-The interview should explore:
+Explore:
 - How they use this feature today
 - What works well and what doesn't
 - Specific frustrations or delights
 - Ideas for improvement`;
+  } else {
+    researchGoal = intake.use_case;
+    specificContext = "Explore the user's experience and needs in depth.";
   }
 
-  const prompt = `Create a Perspective AI research interview using the perspective_create tool.
+  return `Create a research interview called "Lenny Listens: ${companyName}" to ${researchGoal}.
 
-Use these parameters:
-- workspace_id: "66b2a843beda3ed6fd4507bd"
-- agent_context: "research"
+${specificContext}
 
-IMPORTANT: The description must be highly specific to this research context. Do NOT create a generic interview.
-
-RESEARCH CONTEXT FOR ${companyName.toUpperCase()}:
-${researchContext || `Use case: ${use_case}`}
-
-Create a research interview called "Lenny Listens: ${companyName}" that is SPECIFICALLY designed to explore the context above.
-
-Use Lenny Rachitsky's interviewing methodology from 269 episodes of Lenny's Podcast:
+Use Lenny Rachitsky's interviewing methodology:
 
 THREE-LAYER APPROACH:
-1. Origin Story - Start with how they discovered the problem or need described above
-2. Framework - Extract their mental model, criteria, and tradeoffs related to this specific topic
-3. Application - Get specific examples and concrete details about their experience
+1. Origin Story - Start with how they discovered the problem or need
+2. Framework - Extract their mental model, criteria, and tradeoffs
+3. Application - Get specific examples and concrete details
 
 CORE TECHNIQUES:
 - "Pull the thread" - When something interesting emerges, dig deeper
@@ -128,101 +116,83 @@ CORE TECHNIQUES:
 VOICE:
 - Warm, curious, intellectually engaged
 - Use phrases like "I'm curious...", "That's really interesting...", "Can you give me a specific example?"
-- Take a student posture, not an expert position
-
-The description you pass to perspective_create MUST include the specific research context above - do not generalize it.
-
-Call the perspective_create tool now.`;
-
-  let result: {
-    perspective_id?: string;
-    preview_url?: string;
-    share_url?: string;
-  } = {};
-
-  for await (const message of query({
-    prompt,
-    options: {
-      maxTurns: 3,
-      allowedTools: ["mcp__perspective__perspective_create"],
-      mcpServers: {
-        perspective: {
-          type: "http",
-          url: "https://getperspective.ai/mcp",
-          headers: {
-            Authorization: `Bearer ${PERSPECTIVE_MCP_TOKEN}`,
-          },
-        },
-      },
-    },
-  })) {
-    // Log message type for debugging
-    console.log("Message keys:", Object.keys(message));
-
-    // Check for tool use results in the message
-    if ("toolUseResults" in message && Array.isArray(message.toolUseResults)) {
-      console.log("Found toolUseResults:", JSON.stringify(message.toolUseResults, null, 2));
-      for (const toolResult of message.toolUseResults) {
-        if (toolResult.toolName?.includes("perspective_create")) {
-          try {
-            const data = typeof toolResult.result === "string"
-              ? JSON.parse(toolResult.result)
-              : toolResult.result;
-            console.log("Parsed tool result data:", JSON.stringify(data, null, 2));
-            result = {
-              perspective_id: data.perspective_id || data.id,
-              preview_url: data.preview_url,
-              share_url: data.share_url,
-            };
-          } catch (e) {
-            console.log("Failed to parse tool result:", e);
-          }
-        }
-      }
-    }
-
-    // Also try to extract from the final result text
-    if ("result" in message && typeof message.result === "string") {
-      console.log("Agent result:", message.result);
-
-      // Parse URLs from the result text if we don't have them yet
-      if (!result.preview_url) {
-        const previewMatch = message.result.match(/https:\/\/pv\.getperspective\.ai\/share\/[^\s\)\]\"]+/);
-        const shareMatch = message.result.match(/https:\/\/getperspective\.ai\/share\/[^\s\)\]\"]+/);
-
-        if (previewMatch) result.preview_url = previewMatch[0];
-        if (shareMatch) result.share_url = shareMatch[0];
-      }
-
-      // Try multiple patterns for perspective ID extraction
-      if (!result.perspective_id) {
-        // Pattern 1: "Perspective ID: xxx" or "perspective_id: xxx"
-        const idMatch1 = message.result.match(/[Pp]erspective[_ ][Ii][Dd][:\s`"']*([a-f0-9]{24})/i);
-        // Pattern 2: Any 24-char hex string that looks like a MongoDB ObjectId
-        const idMatch2 = message.result.match(/\b([a-f0-9]{24})\b/);
-        // Pattern 3: "id": "xxx" in JSON-like format
-        const idMatch3 = message.result.match(/["']?id["']?\s*[:\s]\s*["']?([a-f0-9]{24})["']?/i);
-
-        if (idMatch1) {
-          result.perspective_id = idMatch1[1];
-          console.log("Extracted ID via pattern 1:", result.perspective_id);
-        } else if (idMatch3) {
-          result.perspective_id = idMatch3[1];
-          console.log("Extracted ID via pattern 3:", result.perspective_id);
-        } else if (idMatch2) {
-          result.perspective_id = idMatch2[1];
-          console.log("Extracted ID via pattern 2:", result.perspective_id);
-        }
-      }
-    }
-  }
-
-  console.log("Final extracted result:", JSON.stringify(result, null, 2));
-
-  return result;
+- Take a student posture, not an expert position`;
 }
 
-// Main endpoint - called by webhook or directly
+// Call Perspective MCP to create a perspective
+async function createPerspective(description: string): Promise<{
+  perspective_id: string;
+  preview_url: string;
+  share_url: string;
+}> {
+  // MCP uses JSON-RPC 2.0 format
+  const response = await fetch("https://getperspective.ai/mcp", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${PERSPECTIVE_MCP_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: Date.now(),
+      method: "tools/call",
+      params: {
+        name: "perspective_create",
+        arguments: {
+          workspace_id: WORKSPACE_ID,
+          description: description,
+          agent_context: "research",
+        },
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("MCP call failed:", response.status, errorText);
+    throw new Error(`MCP call failed: ${response.statusText}`);
+  }
+
+  const result = await response.json();
+  console.log("MCP response:", JSON.stringify(result, null, 2));
+
+  // Handle MCP response format
+  if (result.error) {
+    throw new Error(`MCP error: ${result.error.message || JSON.stringify(result.error)}`);
+  }
+
+  // Extract the content from MCP response
+  // MCP tool results come in result.content array
+  let data: Record<string, unknown> = {};
+
+  if (result.result?.content) {
+    for (const item of result.result.content) {
+      if (item.type === "text") {
+        try {
+          data = JSON.parse(item.text);
+        } catch {
+          console.log("Content text (not JSON):", item.text);
+        }
+      }
+    }
+  } else if (result.result) {
+    data = result.result;
+  }
+
+  console.log("Parsed data:", JSON.stringify(data, null, 2));
+
+  if (!data.perspective_id && !data.preview_url) {
+    throw new Error("Failed to get perspective data from MCP response");
+  }
+
+  return {
+    perspective_id: (data.perspective_id || data.id) as string,
+    preview_url: data.preview_url as string,
+    share_url: data.share_url as string,
+  };
+}
+
+// Main endpoint
 app.post("/generate", async (req, res) => {
   try {
     const { conversation_id, intake } = req.body;
@@ -233,12 +203,12 @@ app.post("/generate", async (req, res) => {
 
     console.log(`Generating perspective for ${intake.company_domain}...`);
 
-    // Generate the perspective using Claude + MCP
-    const result = await generatePerspective(intake);
+    // Build the description from intake data
+    const description = buildDescription(intake);
+    console.log("Description:", description);
 
-    if (!result.preview_url || !result.share_url) {
-      throw new Error("Failed to get perspective URLs from generation");
-    }
+    // Create the perspective via MCP
+    const result = await createPerspective(description);
 
     console.log(`Created perspective: ${result.perspective_id}`);
 
@@ -254,7 +224,6 @@ app.post("/generate", async (req, res) => {
         generated_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
       });
-      console.log(`Updated KV for conversation ${conversation_id}`);
     }
 
     return res.json({
