@@ -143,6 +143,7 @@ function ResultContent() {
       window.Perspective.init({
         researchId: perspective.perspective_id,
         type: "popup",
+        params: { mode: "restart" },
         onClose: () => {
           console.log("Preview interview closed");
         },

@@ -70,7 +70,8 @@ export default function Home() {
         researchId: "ICYxmulx",
         type: "popup",
         // Pass session_id as custom param - gets stored in participant_metadata
-        params: { session_id: sessionId },
+        // mode=restart ensures a fresh interview each time
+        params: { session_id: sessionId, mode: "restart" },
         onSubmit: () => {
           console.log("Perspective onSubmit fired, redirecting with session:", sessionId);
           // Redirect with session ID - webhook will have stored data indexed by this
