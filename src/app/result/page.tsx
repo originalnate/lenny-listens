@@ -14,7 +14,8 @@ function ResultContent() {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [pollAttempts, setPollAttempts] = useState(0);
-  const maxPollAttempts = 20; // Try for about 60 seconds
+  const [foundId, setFoundId] = useState<string | null>(conversationId); // Track the ID we're polling
+  const maxPollAttempts = 40; // Try for about 2 minutes (generation takes ~2 min)
 
   const fetchPerspective = useCallback(async () => {
     // If no conversation ID and not in poll mode, show error
@@ -24,9 +25,10 @@ function ResultContent() {
     }
 
     try {
-      // Use latest endpoint in poll mode, otherwise fetch by ID
-      const url = conversationId
-        ? `/api/perspective/${conversationId}`
+      // Once we've found an ID, always poll that specific one
+      // Otherwise use latest endpoint in poll mode
+      const url = foundId
+        ? `/api/perspective/${foundId}`
         : `/api/perspective/latest`;
 
       const response = await fetch(url);
@@ -37,10 +39,10 @@ function ResultContent() {
           setPollAttempts((prev) => prev + 1);
         }
         setPerspective({
-          conversation_id: conversationId || "pending",
+          conversation_id: foundId || "pending",
           status: "pending",
           intake: {
-            conversation_id: conversationId || "pending",
+            conversation_id: foundId || "pending",
             name: "",
             company_domain: "",
             use_case: "feature_request",
@@ -57,6 +59,12 @@ function ResultContent() {
 
       const data = await response.json();
       setPerspective(data);
+
+      // Once we find a perspective, lock onto its ID for future polls
+      if (data.conversation_id && !foundId) {
+        setFoundId(data.conversation_id);
+      }
+
       setPollAttempts(0); // Reset on success
     } catch (err) {
       console.error("Error fetching perspective:", err);
@@ -66,7 +74,7 @@ function ResultContent() {
         setError("Failed to load your interview. Please try again.");
       }
     }
-  }, [conversationId, pollMode, pollAttempts]);
+  }, [conversationId, pollMode, pollAttempts, foundId]);
 
   useEffect(() => {
     fetchPerspective();
