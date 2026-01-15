@@ -32,10 +32,10 @@ function ResultContent() {
       if (response.status === 404) {
         // Perspective not found yet - might still be processing webhook
         setPerspective({
-          conversation_id: conversationId,
+          conversation_id: conversationId || "pending",
           status: "pending",
           intake: {
-            conversation_id: conversationId,
+            conversation_id: conversationId || "pending",
             name: "",
             company_domain: "",
             use_case: "feature_request",
