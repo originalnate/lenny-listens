@@ -240,15 +240,9 @@ async function updatePerspectiveHost(perspectiveId: string): Promise<void> {
   console.log("Perspective update response:", text.substring(0, 500));
 }
 
-// Main endpoint
-app.post("/generate", async (req, res) => {
+// Background generation function
+async function generatePerspective(conversationId: string, intake: IntakeData) {
   try {
-    const { conversation_id, intake } = req.body;
-
-    if (!intake) {
-      return res.status(400).json({ error: "Missing intake data" });
-    }
-
     console.log(`Generating perspective for ${intake.company_domain}...`);
 
     // Build the description from intake data
@@ -270,33 +264,56 @@ app.post("/generate", async (req, res) => {
     }
 
     // Update KV with the generated URLs
-    if (conversation_id) {
-      await updateKV(conversation_id, {
-        conversation_id,
-        status: "ready",
-        intake,
-        preview_url: result.preview_url,
-        share_url: result.share_url,
-        perspective_id: result.perspective_id,
-        generated_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-      });
-    }
-
-    return res.json({
-      success: true,
-      conversation_id,
-      perspective_id: result.perspective_id,
+    await updateKV(conversationId, {
+      conversation_id: conversationId,
+      status: "ready",
+      intake,
       preview_url: result.preview_url,
       share_url: result.share_url,
+      perspective_id: result.perspective_id,
+      generated_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
     });
+
+    console.log(`Generation complete for ${conversationId}`);
   } catch (error) {
     console.error("Generation error:", error);
-    return res.status(500).json({
-      error: "Failed to generate perspective",
-      details: error instanceof Error ? error.message : String(error),
-    });
+    // Update KV with error status
+    try {
+      await updateKV(conversationId, {
+        conversation_id: conversationId,
+        status: "error",
+        intake,
+        error: error instanceof Error ? error.message : String(error),
+        created_at: new Date().toISOString(),
+      });
+    } catch (kvError) {
+      console.error("Failed to update KV with error status:", kvError);
+    }
   }
+}
+
+// Main endpoint - returns immediately, processes in background
+app.post("/generate", (req, res) => {
+  const { conversation_id, intake } = req.body;
+
+  if (!intake) {
+    return res.status(400).json({ error: "Missing intake data" });
+  }
+
+  if (!conversation_id) {
+    return res.status(400).json({ error: "Missing conversation_id" });
+  }
+
+  // Start generation in background (don't await)
+  generatePerspective(conversation_id, intake);
+
+  // Return immediately
+  return res.status(202).json({
+    accepted: true,
+    conversation_id,
+    message: "Generation started",
+  });
 });
 
 // Health check

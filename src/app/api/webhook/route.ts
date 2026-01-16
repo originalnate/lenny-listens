@@ -63,17 +63,20 @@ export async function POST(request: NextRequest) {
 
     console.log(`Stored intake for conversation ${conversationId}`);
 
-    // Trigger perspective generation via Railway microservice (fire and forget)
+    // Trigger perspective generation via Railway microservice
+    // Must await the fetch or Vercel will terminate before request is sent
     const generatorUrl = process.env.GENERATOR_URL || "https://lenny-listens-production.up.railway.app";
-    fetch(`${generatorUrl}/generate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ conversation_id: conversationId, intake }),
-    }).catch((err) => {
+    try {
+      const genResponse = await fetch(`${generatorUrl}/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversation_id: conversationId, intake }),
+      });
+      console.log(`Generation triggered for ${conversationId}, status: ${genResponse.status}`);
+    } catch (err) {
       console.error("Failed to trigger generation:", err);
-    });
-
-    console.log(`Triggered generation for conversation ${conversationId}`);
+      // Don't fail the webhook - the generation can be retried
+    }
 
     return NextResponse.json({
       success: true,
