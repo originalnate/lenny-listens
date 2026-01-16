@@ -85,6 +85,39 @@ export function getUseCaseLabel(useCase: string): string {
     feature_request: "Feature Requests",
     new_product_discovery: "Product Discovery",
     existing_feature_feedback: "Feature Feedback",
+    "feature requests": "Feature Requests",
+    "new product discovery": "Product Discovery",
+    "existing feature feedback": "Feature Feedback",
   };
   return labels[useCase] || "Customer Research";
+}
+
+// Build the interview prompt for passing to signup
+export function buildInterviewPrompt(intake: IntakeData): string {
+  const companyName = intake.company_domain?.replace(/\.(com|io|co|ai|org|net)$/i, "") || "my company";
+
+  let researchGoal = "";
+  let specificContext = "";
+  const useCase = intake.use_case?.toLowerCase().replace(/_/g, " ");
+
+  if (useCase === "new product discovery") {
+    researchGoal = "validate a new product concept";
+    specificContext = `Target audience: ${intake.market_or_audience || "potential customers"}
+Hypothesis to validate: ${intake.hypothesis || "the product solves a real problem"}`;
+  } else if (useCase === "feature request" || useCase === "feature requests") {
+    researchGoal = "understand feature requests and user needs";
+    specificContext = `Problem users are trying to solve: ${intake.problem_to_solve || "unspecified"}
+Current workaround: ${intake.current_workaround || "unknown"}`;
+  } else if (useCase === "existing feature feedback") {
+    researchGoal = "get feedback on an existing feature";
+    specificContext = `Feature: ${intake.feature_name || "unspecified"}
+Aspects to explore: ${intake.feedback_aspects || "general feedback"}`;
+  } else {
+    researchGoal = "understand customer needs";
+    specificContext = "";
+  }
+
+  return `Create a customer research interview for ${companyName} to ${researchGoal}. ${specificContext}
+
+Use Lenny Rachitsky's interviewing methodology: pull the thread on interesting topics, find tensions and contradictions, seek specific examples, and maintain a warm, curious tone.`;
 }
