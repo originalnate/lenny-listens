@@ -341,7 +341,7 @@ function ResultContent() {
               Create this interview in your own Perspective AI workspace to start gathering real insights.
             </p>
             <a
-              href={`https://getperspective.ai/signup?question=${encodeURIComponent(buildInterviewPrompt(perspective.intake))}`}
+              href={`https://getperspective.ai/research/new?question=${encodeURIComponent(buildInterviewPrompt(perspective.intake))}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-purple-600 px-6 font-semibold text-white transition-colors hover:bg-purple-700"
@@ -364,7 +364,7 @@ function ResultContent() {
             Create this interview in your own workspace. Analyze responses with AI and get actionable insights.
           </p>
           <a
-            href={`https://getperspective.ai/signup?question=${encodeURIComponent(buildInterviewPrompt(perspective.intake))}`}
+            href={`https://getperspective.ai/research/new?question=${encodeURIComponent(buildInterviewPrompt(perspective.intake))}`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-white px-8 font-semibold text-purple-600 transition-colors hover:bg-purple-50"
