@@ -99,7 +99,7 @@ export default function Home() {
               <span>Powered by 269 episodes of Lenny&apos;s Podcast</span>
             </div>
             <a
-              href="https://getperspective.ai"
+              href="https://getperspective.ai?utm_source=lenny-listens"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 rounded-full bg-purple-100 px-4 py-2 text-sm font-medium text-purple-800 transition-colors hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-200 dark:hover:bg-purple-900/50"
@@ -247,7 +247,7 @@ export default function Home() {
         <footer className="mt-24 text-center text-sm text-zinc-500">
           <p>
             Built with{" "}
-            <a href="https://getperspective.ai" className="text-amber-600 hover:underline dark:text-amber-400">
+            <a href="https://getperspective.ai?utm_source=lenny-listens" className="text-amber-600 hover:underline dark:text-amber-400">
               Perspective AI
             </a>
             {" "}• Inspired by{" "}
