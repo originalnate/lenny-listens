@@ -251,7 +251,7 @@ export default function Home() {
               Perspective AI
             </a>
             {" "}• Inspired by{" "}
-            <a href="https://www.lennysnewsletter.com" className="text-amber-600 hover:underline dark:text-amber-400">
+            <a href="https://www.lennysnewsletter.com?utm_source=lenny-listens" className="text-amber-600 hover:underline dark:text-amber-400">
               Lenny&apos;s Newsletter
             </a>
           </p>
