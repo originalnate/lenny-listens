@@ -75,18 +75,6 @@ function ResultContent() {
       if (response.status === 404) {
         // Not found yet - might still be processing webhook
         setPollAttempts((prev) => prev + 1);
-        setPerspective({
-          conversation_id: conversationId || "pending",
-          status: "pending",
-          intake: {
-            conversation_id: conversationId || "pending",
-            name: "",
-            company_domain: "",
-            use_case: "feature_request",
-            created_at: new Date().toISOString(),
-          },
-          created_at: new Date().toISOString(),
-        });
         return;
       }
 
@@ -96,33 +84,38 @@ function ResultContent() {
 
       const data = await response.json();
       setPerspective(data);
-      setPollAttempts(0); // Reset on success
+
+      // Keep polling if still pending/generating
+      if (data.status === "pending" || data.status === "generating") {
+        setPollAttempts((prev) => prev + 1);
+      }
     } catch (err) {
       console.error("Error fetching perspective:", err);
-      if (pollAttempts < maxPollAttempts) {
-        setPollAttempts((prev) => prev + 1);
-      } else {
-        setError("Failed to load your interview. Please try again.");
-      }
+      setPollAttempts((prev) => prev + 1);
     }
-  }, [conversationId, sessionId, pollAttempts]);
+  }, [conversationId, sessionId]);
 
   useEffect(() => {
     fetchPerspective();
+  }, [fetchPerspective]);
 
-    // Poll every 3 seconds if status is pending or generating
-    const interval = setInterval(() => {
-      if (perspective?.status === "pending" || perspective?.status === "generating") {
-        if (pollAttempts >= maxPollAttempts) {
-          setError("Could not find your interview. Please try again in a moment.");
-          return;
-        }
-        fetchPerspective();
-      }
+  useEffect(() => {
+    // Stop polling once we have a final status
+    if (perspective?.status === "ready" || perspective?.status === "error") {
+      return;
+    }
+
+    if (pollAttempts >= maxPollAttempts) {
+      setError("Could not find your interview. Please try again in a moment.");
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      fetchPerspective();
     }, 3000);
 
-    return () => clearInterval(interval);
-  }, [fetchPerspective, perspective?.status, pollAttempts]);
+    return () => clearTimeout(timer);
+  }, [pollAttempts, perspective?.status, fetchPerspective]);
 
   const openPreviewInterview = () => {
     if (!perspective?.perspective_id) {
