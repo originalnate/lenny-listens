@@ -80,6 +80,75 @@ TARGET: ${companyName}'s customers discussing ${targetTopic}
 ${LENNY_METHODOLOGY}`;
 }
 
+export function buildPerspectiveDescription(intake: IntakeData): string {
+  const companyName = intake.company_domain?.replace(/\.(com|io|co|ai|org|net)$/i, "") || "Company";
+
+  let researchGoal = "";
+  let specificContext = "";
+
+  if (intake.use_case === "new_product_discovery") {
+    researchGoal = "validate a new product concept";
+    specificContext = `
+Target audience: ${intake.market_or_audience || "potential customers"}
+Hypothesis to validate: ${intake.hypothesis || "the product solves a real problem"}
+
+Explore:
+- Whether users have the problem this product solves
+- How they currently deal with this problem
+- Their reaction to the product concept
+- What would make them want to use it`;
+  } else if (intake.use_case === "feature_request") {
+    researchGoal = "understand feature requests and user needs";
+    specificContext = `
+Problem users are trying to solve: ${intake.problem_to_solve || "unspecified"}
+Current workaround: ${intake.current_workaround || "unknown"}
+
+Explore:
+- The specific pain points driving this request
+- How they currently work around the limitation
+- What an ideal solution would look like
+- How important this is relative to other needs`;
+  } else if (intake.use_case === "existing_feature_feedback") {
+    researchGoal = "get feedback on an existing feature";
+    specificContext = `
+Feature: ${intake.feature_name || "unspecified"}
+Aspects to explore: ${intake.feedback_aspects || "general feedback"}
+
+Explore:
+- How they use this feature today
+- What works well and what doesn't
+- Specific frustrations or delights
+- Ideas for improvement`;
+  } else {
+    researchGoal = "understand customer needs";
+    specificContext = "Explore the user's experience and needs in depth.";
+  }
+
+  return `Create a research interview called "Lenny Listens: ${companyName}" to ${researchGoal}.
+
+${specificContext}
+
+Use Lenny Rachitsky's interviewing methodology:
+
+THREE-LAYER APPROACH:
+1. Origin Story - Start with how they discovered the problem or need
+2. Framework - Extract their mental model, criteria, and tradeoffs
+3. Application - Get specific examples and concrete details
+
+CORE TECHNIQUES:
+- "Pull the thread" - When something interesting emerges, dig deeper
+- Find tensions - Explore contradictions and tradeoffs
+- Seek specifics - Ask for concrete examples for broad claims
+- Pause and summarize - Periodically reflect back what you've heard
+
+VOICE:
+- Warm, curious, intellectually engaged
+- Use phrases like "I'm curious...", "That's really interesting...", "Can you give me a specific example?"
+- Take a student posture, not an expert position
+
+Set the interviewer/host name to "Lenny Rachitsky" and use this avatar image: https://lenny-listens.vercel.app/lenny.jpg`;
+}
+
 export function getUseCaseLabel(useCase: string): string {
   const labels: Record<string, string> = {
     feature_request: "Feature Requests",

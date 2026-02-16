@@ -1,6 +1,13 @@
 import { kv } from "@vercel/kv";
 import { NextRequest, NextResponse } from "next/server";
-import { IntakeData, GeneratedPerspective } from "@/lib/lenny-methodology";
+import {
+  IntakeData,
+  GeneratedPerspective,
+  buildPerspectiveDescription,
+} from "@/lib/lenny-methodology";
+
+const PERSPECTIVE_API_TOKEN = process.env.PERSPECTIVE_API_TOKEN;
+const PERSPECTIVE_WORKSPACE_SLUG = process.env.PERSPECTIVE_WORKSPACE_SLUG;
 
 // Webhook endpoint for Perspective AI intake completion
 export async function POST(request: NextRequest) {
@@ -63,19 +70,67 @@ export async function POST(request: NextRequest) {
 
     console.log(`Stored intake for conversation ${conversationId}`);
 
-    // Trigger perspective generation via Railway microservice
-    // Must await the fetch or Vercel will terminate before request is sent
-    const generatorUrl = process.env.GENERATOR_URL || "https://lenny-listens-production.up.railway.app";
+    // Generate perspective directly via Perspective API
     try {
-      const genResponse = await fetch(`${generatorUrl}/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversation_id: conversationId, intake }),
-      });
-      console.log(`Generation triggered for ${conversationId}, status: ${genResponse.status}`);
+      const description = buildPerspectiveDescription(intake);
+      console.log("Creating perspective with description:", description.substring(0, 200));
+
+      const apiResponse = await fetch(
+        "https://getperspective.ai/api/v1/perspective/create",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${PERSPECTIVE_API_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            workspaceSlug: PERSPECTIVE_WORKSPACE_SLUG,
+            userPrompt: description,
+            agentContext: "research",
+          }),
+        }
+      );
+
+      if (!apiResponse.ok) {
+        const errorText = await apiResponse.text();
+        throw new Error(`Perspective API error ${apiResponse.status}: ${errorText}`);
+      }
+
+      const result = await apiResponse.json();
+      console.log("Perspective API response:", JSON.stringify(result, null, 2));
+
+      const perspectiveId = result.perspective_id || result.id;
+      const previewUrl = result.preview_url;
+      const shareUrl = result.share_url;
+
+      // Update KV record to "ready" with URLs
+      const readyRecord: GeneratedPerspective = {
+        conversation_id: conversationId,
+        status: "ready",
+        intake,
+        perspective_id: perspectiveId,
+        preview_url: previewUrl,
+        share_url: shareUrl,
+        created_at: perspectiveRecord.created_at,
+        generated_at: new Date().toISOString(),
+      };
+
+      await kv.set(`perspective:${conversationId}`, readyRecord);
+      await kv.lrem("pending_perspectives", 1, conversationId);
+
+      console.log(`Perspective ready for ${conversationId}: ${perspectiveId}`);
     } catch (err) {
-      console.error("Failed to trigger generation:", err);
-      // Don't fail the webhook - the generation can be retried
+      console.error("Failed to generate perspective:", err);
+      // Update KV with error status
+      const errorRecord: GeneratedPerspective = {
+        conversation_id: conversationId,
+        status: "error",
+        intake,
+        error: err instanceof Error ? err.message : String(err),
+        created_at: perspectiveRecord.created_at,
+      };
+      await kv.set(`perspective:${conversationId}`, errorRecord);
+      await kv.lrem("pending_perspectives", 1, conversationId);
     }
 
     return NextResponse.json({
