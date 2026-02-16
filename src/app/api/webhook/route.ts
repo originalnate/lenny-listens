@@ -99,9 +99,17 @@ export async function POST(request: NextRequest) {
       const result = await apiResponse.json();
       console.log("Perspective API response:", JSON.stringify(result, null, 2));
 
-      const perspectiveId = result.perspective_id || result.id;
-      const previewUrl = result.preview_url;
-      const shareUrl = result.share_url;
+      if (result.status === "needs_input") {
+        throw new Error(`Perspective needs clarification: ${result.followUpQuestion}`);
+      }
+
+      const perspectiveId = result.perspectiveId || result.perspective_id;
+      const previewUrl = result.previewUrl || result.preview_url;
+      const shareUrl = result.shareUrl || result.share_url;
+
+      if (!perspectiveId || !previewUrl) {
+        throw new Error(`Missing perspective data: id=${perspectiveId}, preview=${previewUrl}`);
+      }
 
       // Update KV record to "ready" with URLs
       const readyRecord: GeneratedPerspective = {
